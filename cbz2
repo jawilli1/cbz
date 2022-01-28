@@ -1,0 +1,189 @@
+#! /usr/bin/bash
+#set -x
+
+base_file=${1-.}
+depth=0
+
+# Get location 7-zip application.  It can handle rar, zip, and 7z files.
+zipapp=${ZIPAPP-"/cygdrive/c/Program Files/7-Zip/7z.exe"}
+#echo "zipapp=${zipapp}"
+
+    # Remove the source file.
+    #echo "   " ==\> Removing \""$srcname"\".
+    #rm -f "$srcname"
+
+    # Remove temporary directory.
+    #echo "   " ==\> Removing temporary directory.
+    #rm -rf "$tmpdir"
+
+    #read -n 1 -p "Press any key to continue..." dummy
+
+function collapse ()
+{
+#echo "collapse ${1}"
+
+    if [ "${1}" != "." ]
+    then
+        pushd "${1}" > /dev/null
+    fi
+
+    local f
+    for f in *
+    do
+        if [ -d "${f}" ]
+        then
+            collapse "${f}"
+            rmdir "${f}"
+        fi
+    done
+
+    if [ "${1}" != "." ]
+    then
+#echo "  Move all files up a directory."
+        if [ "$(ls -A .)" ]
+        then
+            mv * ..
+        fi 
+        popd > /dev/null
+    fi
+}
+
+function process_archive ()
+{
+    local full_path
+    local file_name
+    local base_name
+    local cbz_name
+    local subdir
+
+    full_path="${1}"
+
+    echo "  ============================"
+    echo "  ${full_path}"
+
+    # Get the base file name.
+    file_name=$(basename -- "${full_path}")
+    base_name="${file_name%.*}"
+    subdir="TMP_${base_name}"
+    cbz_name="${base_name}.cbz"
+
+    # Extract the archive into a directory
+    echo "    ==> Extract to subdirectory."
+    if [ -e "${subdir}" ]
+    then
+        rm -rf "${subdir}"
+    fi
+    "$zipapp" x -bd -o"${subdir}" "${full_path}" > /dev/null
+
+    # Let's work in the subdirectory from here on (if it exists).
+    if [ -e "${subdir}" ]
+    then
+        pushd "${subdir}" > /dev/null
+
+        # Collapse a directory tree into a single directory.
+        echo "    ==> Collapse subdirectory."
+        collapse .
+
+        # Remove unwanted files: non-graphic and scan-logo files
+        echo "    ==> Clean up files."
+        find . ! -type d ! -iname '*.jpg' ! -iname '*.jpeg' ! -iname '*.gif' ! -iname '*.bmp' ! -iname '*.png' -delete
+ #       find . -name "scan*" -delete
+        find . -name "tag*" -delete
+        find . -name "tn_*" -delete
+        find . -name "wallempire*" -delete
+        find . -name "XXX-*" -delete
+        find . -name "z[A-Z]*" -delete
+        find . -name "zz*" -delete
+        find . -type d -empty -delete
+
+        # Rename files.
+        echo "    ==> Rename files."
+        if [ "$(ls -A .)" ]
+        then
+            # Check for files that match our output file spec.  If there are
+            # any, they can mess up the renaming scheme, and we can lose
+            # files.  If there are any such files, prepend the character 'X'
+            # to the beginning of every file.  This will eliminate any
+            # conflicting files, and will retain file order.
+            #
+            # We used to do this for every directory, and it drastically
+            # slowed the script.  Cygwin's 'mv' command appears to be quite
+            # slow.  Since there actually are very few directories that need
+            # this feature, we make it optional here.  If the 'ls' command
+            # finds any files that match the spec, it returns 0.
+            ls [0-9][0-9][0-9][0-9].* >/dev/null 2>&1
+            if [ $? == 0 ]
+            then
+                for f in *
+                do
+                    mv -i -- "$f" "X$f"
+                done
+            fi
+
+            # Rename files to the dddd.* spec.
+            local i
+            i=0
+            for f in *
+            do
+                new=$(printf "%04d.%s" "$i" "${f#*.}")
+                mv -i -- "$f" "$new"
+                let i=i+1
+            done
+        fi
+
+        # Create the CBZ file.
+        echo "    ==> Create \"${cbz_name}\"".
+        "${zipapp}" a "${cbz_name}" * -mx0 -tzip > /dev/null
+
+        # Return to the parent directory for subsequent work.
+        popd > /dev/null
+   
+        # Remove the original file.  Copy the new file into this directory.
+        # Remove the temporary subdirectory.
+        rm -f "${full_path}"
+        mv "${subdir}/${cbz_name}" .
+        rm -rf "${subdir}"
+    fi
+}
+
+function process_dir ()
+{
+    local f
+
+    let depth=depth+1
+
+    pushd "${1}" > /dev/null
+ #   echo "${depth}>>> ${PWD}"
+    echo "${PWD}"
+    
+    for f in *
+    do
+        if [ -d "${f}" ]
+        then
+            process_dir "${f}"
+        else
+            process_file "${f}"
+        fi
+    done
+
+    popd > /dev/null
+    let depth=depth-1
+ #   echo "${depth}<<< ${PWD}"
+}
+
+function process_file ()
+{
+    if [ -d "${1}" ]
+    then
+        process_dir "${1}"
+    else
+#        echo "file: ${1}"
+        file "${1}" | grep "archive data" > /dev/null
+        if [ $? == 0 ]
+        then
+            process_archive "${1}"
+        fi 
+    fi
+}
+
+process_file "${base_file}"

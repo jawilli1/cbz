@@ -1,0 +1,1 @@
+for d1 in *; do if [ -d "${d1}" ] ; then cd "${d1}"; for d in * ; do if [ -d "${d}" ] ; then ../../Cbzit "${d}"; fi; done; cd - >/dev/null; fi; done

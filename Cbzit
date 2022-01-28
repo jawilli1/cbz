@@ -1,0 +1,62 @@
+#! /usr/bin/bash
+#set -x
+
+echo ==========================================
+
+# Get file components.
+dirname="$1"
+cbzname="$dirname.cbz"
+
+echo "  dirname=$dirname"
+echo "  cbzname=$cbzname"
+
+cd "$dirname" > /dev/null
+
+# Verify that there are image files in this directory.
+#ls *.jpg *.gif *.png >/dev/null 2>&1
+#if [ $? != 0 ]ls Ad
+cnt=$(find -name '*.jpg' -o -name '*.gif' -o -name '*.png' | wc -l)
+#echo "  COUNT=$cnt"
+if [ cnt == 0 ]
+then
+    echo "  !! Skip directory - no image files"
+    exit 0
+fi
+echo "  >> Process directory"
+
+# Get locations of executables.
+rarapp="/cygdrive/c/Program Files/7-Zip/7z.exe"
+zipapp="/cygdrive/c/Program Files/7-Zip/7z.exe"
+
+# Clean up files in the temporary directory.
+echo "   " ==\> Cleaning up files.
+find . ! -type d ! -iname '*.jpg' ! -iname '*.jpeg' ! -iname '*.gif' ! -iname '*.bmp' ! -iname '*.png' -delete
+find . -name "zz*" -delete
+find . -name "tn_*" -delete
+find . -name "XXX-*" -delete
+find . -type d -empty -delete
+
+# Rename files to 0000-9999.
+echo "   " ==\> Renaming files.
+i=0
+for f in *
+do
+    new=$(printf "%04d.%s" "$i" "${f#*.}")
+    mv -i -- "$f" "$new"
+    let i=i+1
+done
+
+# Create the CBZ file.
+echo "   " ==\> Creating \""$cbzname"\".
+"$zipapp" a ../"$cbzname" * -mx0 -tzip > /dev/null
+#cd - > /dev/null
+
+# Remove the source file.
+#echo "   " ==\> Removing \""$srcname"\".
+#rm -f "$srcname"
+
+# Remove temporary directory.
+#echo "   " ==\> Removing temporary directory.
+#rm -rf "$tmpdir"
+
+#read -n 1 -p "Press any key to continue..." dummy

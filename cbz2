@@ -125,7 +125,7 @@ function process_archive ()
             i=0
             for f in *
             do
-                new=$(printf "%04d.%s" "$i" "${f#*.}")
+                new=$(printf "%04d.%s" "$i" "${f##*.}")
                 mv -i -- "$f" "$new"
                 let i=i+1
             done

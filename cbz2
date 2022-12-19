@@ -42,7 +42,7 @@ function collapse ()
 #echo "  Move all files up a directory."
         if [ "$(ls -A .)" ]
         then
-            mv * ..
+            mv -- * ..
         fi 
         popd > /dev/null
     fi

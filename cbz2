@@ -3,24 +3,21 @@
 
 base_file=${1-.}
 depth=0
+debugPrint=0
 
-# Get location 7-zip application.  It can handle rar, zip, and 7z files.
+# Get location of 7-zip application.  It can handle rar, zip, and 7z files.
 zipapp=${ZIPAPP-"/cygdrive/c/Program Files/7-Zip/7z.exe"}
-#echo "zipapp=${zipapp}"
-
-    # Remove the source file.
-    #echo "   " ==\> Removing \""$srcname"\".
-    #rm -f "$srcname"
-
-    # Remove temporary directory.
-    #echo "   " ==\> Removing temporary directory.
-    #rm -rf "$tmpdir"
-
-    #read -n 1 -p "Press any key to continue..." dummy
+if [ "${debugPrint}" != "0" ]
+then
+    echo "zipapp=${zipapp}"
+fi
 
 function collapse ()
 {
-#echo "collapse ${1}"
+    if [ "${debugPrint}" != "0" ]
+    then
+        echo "collapse ${1}"
+    fi
 
     if [ "${1}" != "." ]
     then
@@ -39,7 +36,11 @@ function collapse ()
 
     if [ "${1}" != "." ]
     then
-#echo "  Move all files up a directory."
+        if [ "${debugPrint}" != "0" ]
+        then
+            echo "  Move all files up a directory."
+        fi
+
         if [ "$(ls -A .)" ]
         then
             mv -- * ..
@@ -146,38 +147,38 @@ function process_archive ()
     fi
 }
 
-function process_dir ()
-{
-    local f
-
-    let depth=depth+1
-
-    pushd "${1}" > /dev/null
- #   echo "${depth}>>> ${PWD}"
-    echo "${PWD}"
-    
-    for f in *
-    do
-        if [ -d "${f}" ]
-        then
-            process_dir "${f}"
-        else
-            process_file "${f}"
-        fi
-    done
-
-    popd > /dev/null
-    let depth=depth-1
- #   echo "${depth}<<< ${PWD}"
-}
-
 function process_file ()
 {
+    if [ "${debugPrint}" != "0" ]
+        then
+        echo "process_file: ${1}"
+    fi
+
     if [ -d "${1}" ]
     then
-        process_dir "${1}"
+        local f
+
+        let depth=depth+1
+
+        pushd "${1}" > /dev/null
+        if [ "${debugPrint}" != "0" ]
+        then
+            echo "${depth}>>> ${PWD}"
+        fi
+        echo "${PWD}"
+    
+        for f in *
+        do
+            process_file "${f}"
+        done
+
+        popd > /dev/null
+        let depth=depth-1
+        if [ "${debugPrint}" != "0" ]
+        then
+            echo "${depth}<<< ${PWD}"
+        fi
     else
-#        echo "file: ${1}"
         file "${1}" | grep "archive data" > /dev/null
         if [ $? == 0 ]
         then
